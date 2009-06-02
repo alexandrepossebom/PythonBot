@@ -7,6 +7,7 @@ import sys
 import urllib2
 import HTMLParser
 import os
+import time
 from pysqlite2 import dbapi2 as sqlite
 
 def sendmsg(msg): 
@@ -26,6 +27,7 @@ class db():
 	def create_table(self):
 		self.cursor.execute('CREATE TABLE karma(nome VARCHAR(30) PRIMARY KEY, total INTEGER);')
 		self.cursor.execute('CREATE TABLE url(nome VARCHAR(30) PRIMARY KEY, total INTEGER);')
+		self.cursor.execute('CREATE TABLE slack(nome VARCHAR(30), total INTEGER, data DATE, PRIMARY KEY (data, nome));')
 		self.conn.commit()
 	def insert_karma(self,nome,total):
 		try:
@@ -53,6 +55,17 @@ class db():
 	def increment_url(self,nome):
 		if not self.insert_url(nome,1):
 			self.cursor.execute("UPDATE url SET total = total + 1 where nome = '%s';" % (nome))
+			self.conn.commit()
+	def insert_slack(self,nome,total):
+		try:
+			self.cursor.execute("INSERT INTO slack(nome,total,data) VALUES ('%s', %d, '%s' );" % (nome,total,time.strftime("%Y-%m-%d", time.localtime())))
+			self.conn.commit()
+			return True
+		except:
+			return False
+	def increment_slack(self,nome,total):
+		if not self.insert_slack(nome,total):
+			self.cursor.execute("UPDATE slack SET total = total + %d where nome = '%s' and data = '%s' ;" % (total,nome,time.strftime("%Y-%m-%d", time.localtime())))
 			self.conn.commit()
 	def get_karmas_count(self):
 		self.cursor.execute('SELECT nome,total FROM karma order by total desc')
@@ -85,6 +98,15 @@ class db():
 			else:
 				urls = urls + ', ' + (linha[0]) + ' = ' + str(linha[1])
 		return urls
+	def get_slacker_count(self):
+		self.cursor.execute("SELECT nome,total FROM slack where data = '%s' order by total desc" % (time.strftime("%Y-%m-%d", time.localtime())))
+		slackers = ''
+		for linha in self.cursor:
+			if len(slackers) == 0:
+				slackers = (linha[0]) + ' = ' + str(linha[1])
+			else:
+				slackers = slackers + ', ' + (linha[0]) + ' = ' + str(linha[1])
+		return slackers
 
 
 
@@ -108,12 +130,12 @@ class html(HTMLParser.HTMLParser):
 
 
 banco = db('carcereiro.db')
-channel = '#masmorra'
+channel = '#masmorras'
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(('irc.oftc.net', 6667))
 
-nick = 'carcereiro' 
+nick = 'carcer' 
 sock.send('NICK %s \r\n' % nick)
 sock.send('USER %s \'\' \'\' :%s\r\n' % (nick, 'python'))
 sock.send('JOIN %s \r\n' % channel)
@@ -128,21 +150,30 @@ while True:
 		sock.send('PONG ' + buffer.split() [1] + '\r\n')
 
 	if re.search(':[!@]help', buffer, re.UNICODE) is not None or re.search(':'+nick+'[ ,:]+help', buffer, re.UNICODE) is not None:
-		sendmsg('@karmas, @urls\r\n')
+		sendmsg('@karmas, @urls, @slackers\r\n')
 
 	regexp  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\+\+', re.UNICODE)
 	regexm  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\-\-', re.UNICODE)
 	regexk  = re.compile('PRIVMSG.*[: ]karma ([a-z_\-\.]+)', re.UNICODE)
 	regexu  = re.compile('PRIVMSG.*[: ]\@urls', re.UNICODE)
+	regexs  = re.compile('PRIVMSG.*[: ]\@slackers', re.UNICODE)
 	regexks = re.compile('PRIVMSG.*[: ]\@karmas', re.UNICODE)
+	regexslack  = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG.* :(.*)$', re.UNICODE)
 	pattern_url   = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG .*(http://[a-zA-Z0-9_?=./,\-\+]+)', re.UNICODE)
-
+	
 	resultp  = regexp.search(buffer)
 	resultm  = regexm.search(buffer)
 	resultk  = regexk.search(buffer)
 	resultu  = regexu.search(buffer)
+	results  = regexs.search(buffer)
 	resultks = regexks.search(buffer)
+	resultslack = regexslack.search(buffer)
 	url_search = pattern_url.search(buffer)
+
+	if resultslack is not None:
+		var = len(resultslack.group(2)) - 1
+		nick = resultslack.group(1)
+		banco.increment_slack(nick,var)
 
 	if resultp is not None:
 		var = resultp.group(1)
@@ -167,6 +198,10 @@ while True:
 
 	if resultks is not None:
 		sendmsg('karmas : ' + banco.get_karmas_count())
+		continue
+	
+	if results is not None:
+		sendmsg('slackers in chars : ' + banco.get_slacker_count())
 		continue
 
 	if resultu is not None:
