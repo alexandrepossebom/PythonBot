@@ -1,0 +1,193 @@
+#!/usr/bin/env python
+import re
+import socket
+import shelve
+import urllib
+import sys
+import urllib2
+import HTMLParser
+import os
+from pysqlite2 import dbapi2 as sqlite
+
+def sendmsg(msg): 
+    sock.send('PRIVMSG '+ channel + ' :' + str(msg) + '\r\n')
+
+class db():
+	def __init__(self, dbfile):
+		if not os.path.exists(dbfile):
+			self.conn = sqlite.connect(dbfile)
+			self.cursor = self.conn.cursor()
+			self.create_table()
+		self.conn = sqlite.connect(dbfile)
+		self.cursor = self.conn.cursor()
+	def close(self):
+		self.cursor.close()
+		self.conn.close()
+	def create_table(self):
+		self.cursor.execute('CREATE TABLE karma(nome VARCHAR(30) PRIMARY KEY, total INTEGER);')
+		self.cursor.execute('CREATE TABLE url(nome VARCHAR(30) PRIMARY KEY, total INTEGER);')
+		self.conn.commit()
+	def insert_karma(self,nome,total):
+		try:
+			self.cursor.execute("INSERT INTO karma(nome,total) VALUES ('%s', %d );" % (nome,total))
+			self.conn.commit()
+			return True
+		except:
+			#print "Unexpected error:", sys.exc_info()[0]
+			return False
+	def increment_karma(self,nome):
+		if not self.insert_karma(nome,1):
+			self.cursor.execute("UPDATE karma SET total = total + 1 where nome = '%s';" % (nome))
+			self.conn.commit()
+	def decrement_karma(self,nome):
+		if not self.insert_karma(nome,-1):
+			self.cursor.execute("UPDATE karma SET total = total - 1 where nome = '%s';" % (nome))
+			self.conn.commit()
+	def insert_url(self,nome,total):
+		try:
+			self.cursor.execute("INSERT INTO url(nome,total) VALUES ('%s', %d );" % (nome,total))
+			self.conn.commit()
+			return True
+		except:
+			return False
+	def increment_url(self,nome):
+		if not self.insert_url(nome,1):
+			self.cursor.execute("UPDATE url SET total = total + 1 where nome = '%s';" % (nome))
+			self.conn.commit()
+	def get_karmas_count(self):
+		self.cursor.execute('SELECT nome,total FROM karma order by total desc')
+		karmas = ''
+		for linha in self.cursor:
+			if len(karmas) == 0:
+				karmas = (linha[0]) + ' = ' + str(linha[1])
+			else:
+				karmas = karmas + ', ' + (linha[0]) + ' = ' + str(linha[1])
+		return karmas
+	def get_karmas(self):
+		self.cursor.execute('SELECT nome FROM karma order by total desc')
+		karmas = ''
+		for linha in self.cursor:
+			if len(karmas) == 0:
+				karmas = (linha[0])
+			else:	
+				karmas = karmas + ', ' + (linha[0])
+		return karmas
+	def get_karma(self, nome):
+		self.cursor.execute("SELECT total FROM karma where nome = '%s'" % (nome))
+		for linha in self.cursor:
+				return (linha[0])
+	def get_urls_count(self):
+		self.cursor.execute('SELECT nome,total FROM url order by total desc')
+		urls = ''
+		for linha in self.cursor:
+			if len(urls) == 0:
+				urls = (linha[0]) + ' = ' + str(linha[1])
+			else:
+				urls = urls + ', ' + (linha[0]) + ' = ' + str(linha[1])
+		return urls
+
+
+
+class html(HTMLParser.HTMLParser):
+    def __init__(self):
+        HTMLParser.HTMLParser.__init__(self)
+        self._data = {}
+        self._open_tags = []
+    def handle_starttag(self, tag, attrs):
+        self._open_tags.append(tag)
+    def handle_endtag(self, tag):
+        if len(self._open_tags)>0:
+            self._open_tags.pop()
+    def handle_data(self, data):
+        if len(self._open_tags)>0:
+            self._data[self._open_tags[-1]] = data
+    def __getattr__(self,attr):
+        if not self._data.has_key(attr):
+            return ""    
+        return self._data[attr]
+
+
+banco = db('carcereiro.db')
+channel = '#masmorra'
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect(('irc.oftc.net', 6667))
+
+nick = 'carcereiro' 
+sock.send('NICK %s \r\n' % nick)
+sock.send('USER %s \'\' \'\' :%s\r\n' % (nick, 'python'))
+sock.send('JOIN %s \r\n' % channel)
+
+while True:
+	buffer = sock.recv(2040)
+	if not buffer:
+		break
+	print buffer
+
+	if buffer.find('PING') != -1: 
+		sock.send('PONG ' + buffer.split() [1] + '\r\n')
+
+	if re.search(':[!@]help', buffer, re.UNICODE) is not None or re.search(':'+nick+'[ ,:]+help', buffer, re.UNICODE) is not None:
+		sendmsg('@karmas, @urls\r\n')
+
+	regexp  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\+\+', re.UNICODE)
+	regexm  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\-\-', re.UNICODE)
+	regexk  = re.compile('PRIVMSG.*[: ]karma ([a-z_\-\.]+)', re.UNICODE)
+	regexu  = re.compile('PRIVMSG.*[: ]\@urls', re.UNICODE)
+	regexks = re.compile('PRIVMSG.*[: ]\@karmas', re.UNICODE)
+	pattern_url   = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG .*(http://[a-zA-Z0-9_?=./,\-\+]+)', re.UNICODE)
+
+	resultp  = regexp.search(buffer)
+	resultm  = regexm.search(buffer)
+	resultk  = regexk.search(buffer)
+	resultu  = regexu.search(buffer)
+	resultks = regexks.search(buffer)
+	url_search = pattern_url.search(buffer)
+
+	if resultp is not None:
+		var = resultp.group(1)
+		banco.increment_karma(var)
+		sendmsg(var + ' now has ' + str(banco.get_karma(var)) + ' points of karma')
+		continue
+
+	if resultm is not None:
+		var = resultm.group(1)
+		banco.decrement_karma(var)
+		sendmsg(var + ' now has ' + str(banco.get_karma(var)) + ' points of karma')
+		continue
+
+	if resultk is not None:
+		var = resultk.group(1)
+		points = banco.get_karma(var)
+		if points is not None:
+			sendmsg(var + ' have ' + str(points) + ' points of karma')
+		else:
+			sendmsg(var + ' doesn\'t have any point of karma')
+		continue
+
+	if resultks is not None:
+		sendmsg('karmas : ' + banco.get_karmas_count())
+		continue
+
+	if resultu is not None:
+		sendmsg('users : ' + banco.get_urls_count())
+		continue
+	
+	if url_search is not None:
+		try:
+			url  = url_search.group(2)
+			nick = url_search.group(1)
+			usock = urllib.urlopen(url)
+			txt =  usock.read(4096)
+			parser = html()
+			parser.feed(txt)
+			title = str(parser.title).strip()
+			sendmsg('[ ' + title  + ' ]')	
+			banco.increment_url(nick)
+		except:
+			sendmsg('[ Failed ]')
+			print url
+			print "Unexpected error:", sys.exc_info()[0]
+
+sock.close()
+banco.close()
