@@ -130,12 +130,12 @@ class html(HTMLParser.HTMLParser):
 
 
 banco = db('carcereiro.db')
-channel = '#masmorras'
+channel = '#masmorra'
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(('irc.oftc.net', 6667))
 
-nick = 'carcer' 
+nick = 'carcereiro' 
 sock.send('NICK %s \r\n' % nick)
 sock.send('USER %s \'\' \'\' :%s\r\n' % (nick, 'python'))
 sock.send('JOIN %s \r\n' % channel)
@@ -154,7 +154,7 @@ while True:
 
 	regexp  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\+\+', re.UNICODE)
 	regexm  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\-\-', re.UNICODE)
-	regexk  = re.compile('PRIVMSG.*[: ]karma ([a-z_\-\.]+)', re.UNICODE)
+	regexk  = re.compile('PRIVMSG.*:karma ([a-z_\-\.]+)', re.UNICODE)
 	regexu  = re.compile('PRIVMSG.*[: ]\@urls', re.UNICODE)
 	regexs  = re.compile('PRIVMSG.*[: ]\@slackers', re.UNICODE)
 	regexks = re.compile('PRIVMSG.*[: ]\@karmas', re.UNICODE)
