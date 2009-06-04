@@ -154,8 +154,8 @@ while True:
 	if re.search(':[!@]help', buffer, re.UNICODE) is not None or re.search(':'+nick+'[ ,:]+help', buffer, re.UNICODE) is not None:
 		sendmsg('@karmas, @urls, @slackers\r\n')
 
-	regexp  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\+\+', re.UNICODE)
-	regexm  = re.compile('PRIVMSG.*[: ]([a-z_\-\.]+)\-\-', re.UNICODE)
+	regexp  = re.compile('PRIVMSG.*[: ]([0-9a-z_\-\.]+)\+\+', re.UNICODE)
+	regexm  = re.compile('PRIVMSG.*[: ]([0-9a-z_\-\.]+)\-\-', re.UNICODE)
 	regexk  = re.compile('PRIVMSG.*:karma ([a-z_\-\.]+)', re.UNICODE)
 	regexu  = re.compile('PRIVMSG.*[: ]\@urls', re.UNICODE)
 	regexs  = re.compile('PRIVMSG.*[: ]\@slackers', re.UNICODE)
