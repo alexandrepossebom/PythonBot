@@ -12,6 +12,12 @@ import os
 import time
 from pysqlite2 import dbapi2 as sqlite
 
+
+channel = '#masmorra'
+nick = 'carcereiro'
+server = 'irc.oftc.net' 
+
+
 def sendmsg(msg): 
     sock.send('PRIVMSG '+ channel + ' :' + str(msg) + '\r\n')
 
@@ -132,12 +138,8 @@ class html(HTMLParser.HTMLParser):
 
 
 banco = db('carcereiro.db')
-channel = '#masmorra'
-
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(('irc.oftc.net', 6667))
-
-nick = 'carcereiro' 
+sock.connect((server, 6667))
 sock.send('NICK %s \r\n' % nick)
 sock.send('USER %s \'\' \'\' :%s\r\n' % (nick, 'python'))
 sock.send('JOIN %s \r\n' % channel)
