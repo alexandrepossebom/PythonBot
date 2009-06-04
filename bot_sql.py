@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import re
 import socket
 import shelve
@@ -159,7 +161,7 @@ while True:
 	regexs  = re.compile('PRIVMSG.*[: ]\@slackers', re.UNICODE)
 	regexks = re.compile('PRIVMSG.*[: ]\@karmas', re.UNICODE)
 	regexslack  = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG.* :(.*)$', re.UNICODE)
-	pattern_url   = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG .*(http://[a-zA-Z0-9_?=./,\-\+]+)', re.UNICODE)
+	pattern_url   = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG .*(http://[áéíóúÁÉÍÓÚÀàa-zA-Z0-9_?=./,\-\+\']+)', re.UNICODE)
 	
 	resultp  = regexp.search(buffer)
 	resultm  = regexm.search(buffer)
