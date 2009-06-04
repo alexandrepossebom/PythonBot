@@ -214,10 +214,16 @@ while True:
 		try:
 			url  = url_search.group(2)
 			nick = url_search.group(1)
-			usock = urllib.urlopen(url)
-			txt =  usock.read(4096)
+			headers = {
+				'User-Agent' : 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.7.10)',
+				'Accept-Language' : 'pt-br,en-us,en',
+				'Accept-Charset' : 'utf-8,ISO-8859-1'
+			}
+			reqObj = urllib2.Request(url, None, headers)
+			urlObj = urllib2.urlopen(reqObj)
+			response = urlObj.read(4096)
 			parser = html()
-			parser.feed(txt)
+			parser.feed(response)
 			title = str(parser.title).strip()
 			sendmsg('[ ' + title  + ' ]')	
 			banco.increment_url(nick)
