@@ -1,22 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 import re
 import socket
-import shelve
-import urllib
 import sys
 import urllib2
-import HTMLParser
 import os
 import time
 from pysqlite2 import dbapi2 as sqlite
 
-
 channel = '#masmorra'
 nick = 'carcereiro'
 server = 'irc.oftc.net' 
-
 
 def sendmsg(msg): 
     sock.send('PRIVMSG '+ channel + ' :' + str(msg) + '\r\n')
@@ -117,24 +111,33 @@ class db():
 		return slackers
 
 
-
-class html(HTMLParser.HTMLParser):
-    def __init__(self):
-        HTMLParser.HTMLParser.__init__(self)
-        self._data = {}
-        self._open_tags = []
-    def handle_starttag(self, tag, attrs):
-        self._open_tags.append(tag)
-    def handle_endtag(self, tag):
-        if len(self._open_tags)>0:
-            self._open_tags.pop()
-    def handle_data(self, data):
-        if len(self._open_tags)>0:
-            self._data[self._open_tags[-1]] = data
-    def __getattr__(self,attr):
-        if not self._data.has_key(attr):
-            return ""    
-        return self._data[attr]
+class html:
+	def __init__(self, url):
+		self.url = url
+		self.feed = None
+		self.headers = {
+	      'User-Agent' : 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.7.10)',
+   	   'Accept-Language' : 'pt-br,en-us,en',
+      	'Accept-Charset' : 'utf-8,ISO-8859-1'
+	   }
+	def title(self):
+		self.feed = self.get_data()
+		title_pattern = re.compile(r"<[Tt][Ii][Tt][Ll][Ee]>(.*)</[Tt][Ii][Tt][Ll][Ee]>", re.UNICODE)
+		title_search = title_pattern.search(self.feed)
+		if title_search is not None:
+			try:
+				return "[ "+re.sub("&#?\w+;", "", title_search.group(1) )+" ]"
+			except:
+				print "Unexpected error:", sys.exc_info()[0]
+				return "[ Fail in parse ]"
+	def get_data(self):
+		try:
+			reqObj = urllib2.Request(self.url, None, self.headers)
+			urlObj = urllib2.urlopen(reqObj)
+			return  urlObj.read(4096).strip().replace("\n","")
+		except:
+			print "Unexpected error:", sys.exc_info()
+			return "<title>Fail in get</title>"
 
 
 banco = db('carcereiro.db')
@@ -143,6 +146,8 @@ sock.connect((server, 6667))
 sock.send('NICK %s \r\n' % nick)
 sock.send('USER %s \'\' \'\' :%s\r\n' % (nick, 'python'))
 sock.send('JOIN %s \r\n' % channel)
+
+
 
 while True:
 	buffer = sock.recv(2040)
@@ -156,14 +161,14 @@ while True:
 	if re.search(':[!@]help', buffer, re.UNICODE) is not None or re.search(':'+nick+'[ ,:]+help', buffer, re.UNICODE) is not None:
 		sendmsg('@karmas, @urls, @slackers\r\n')
 
-	regexp  = re.compile('PRIVMSG.*[: ]([0-9a-z_\-\.]+)\+\+', re.UNICODE)
-	regexm  = re.compile('PRIVMSG.*[: ]([0-9a-z_\-\.]+)\-\-', re.UNICODE)
+	regexp  = re.compile('PRIVMSG.*[: ]([a-z][0-9a-z_\-\.]+)\+\+', re.UNICODE)
+	regexm  = re.compile('PRIVMSG.*[: ]([a-z][0-9a-z_\-\.]+)\-\-', re.UNICODE)
 	regexk  = re.compile('PRIVMSG.*:karma ([a-z_\-\.]+)', re.UNICODE)
 	regexu  = re.compile('PRIVMSG.*[: ]\@urls', re.UNICODE)
 	regexs  = re.compile('PRIVMSG.*[: ]\@slackers', re.UNICODE)
 	regexks = re.compile('PRIVMSG.*[: ]\@karmas', re.UNICODE)
 	regexslack  = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG.* :(.*)$', re.UNICODE)
-	pattern_url   = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG .*(http://[áéíóúÁÉÍÓÚÀàa-zA-Z0-9_?=./,\-\+\']+)', re.UNICODE)
+	pattern_url   = re.compile(':([a-zA-Z0-9\_]+)!.* PRIVMSG .*(http://[áéíóúÁÉÍÓÚÀàa-zA-Z0-9_?=./,\-\+\'~]+)', re.UNICODE)
 	
 	resultp  = regexp.search(buffer)
 	resultm  = regexm.search(buffer)
@@ -216,19 +221,9 @@ while True:
 		try:
 			url  = url_search.group(2)
 			nick = url_search.group(1)
-			headers = {
-				'User-Agent' : 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.7.10)',
-				'Accept-Language' : 'pt-br,en-us,en',
-				'Accept-Charset' : 'utf-8,ISO-8859-1'
-			}
-			reqObj = urllib2.Request(url, None, headers)
-			urlObj = urllib2.urlopen(reqObj)
-			response = urlObj.read(4096)
-			parser = html()
-			parser.feed(response)
-			title = str(parser.title).strip()
-			sendmsg('[ ' + title  + ' ]')	
-			banco.increment_url(nick)
+			parser = html(url)
+			sendmsg(  parser.title() )
+			banco.increment_url( nick )
 		except:
 			sendmsg('[ Failed ]')
 			print url
