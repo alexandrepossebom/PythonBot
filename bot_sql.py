@@ -134,7 +134,7 @@ class html:
 		try:
 			reqObj = urllib2.Request(self.url, None, self.headers)
 			urlObj = urllib2.urlopen(reqObj)
-			return  urlObj.read(4096).strip().replace("\n","")
+			return  urlObj.read(4096).strip().replace("\n","").replace("\r", "")
 		except:
 			print "Unexpected error:", sys.exc_info()
 			return "<title>Fail in get</title>"
